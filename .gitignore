@@ -19,6 +19,7 @@ backend/src/vector_store/
 # Uploaded/generated data
 backend/src/data/uploads/
 backend/src/data/processed/
+backend/src/temps
 
 # IDE
 .vscode/settings.json

@@ -1,14 +1,21 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
-import { Loader2, AlertCircle, Clock, Sparkles } from 'lucide-react'
+import { Loader2, AlertCircle, Clock, Sparkles, FileText } from 'lucide-react'
 import AnalyticsDashboard from './components/AnalyticsDashboard'
 import type { ModelMetrics } from './components/AnalyticsDashboard'
 
-interface AuditResult {
-  diagnosis: string
-  strategy: string
-  optimizedSql: string
-  executionTime: number
+interface SingleAuditResponse {
+  model: string
+  result: string
+  time: number
+  tokens: number
+  sources: string[]
+}
+
+interface ComparativeAuditResponse {
+  gemini: { result: string; time: number; tokens: number }
+  deepseek: { result: string; time: number; tokens: number }
+  sources: string[]
 }
 
 function App(): ReactElement {
@@ -20,14 +27,11 @@ function App(): ReactElement {
 
   const [isLoading, setIsLoading] = useState(false)
   const [loadingMessage, setLoadingMessage] = useState('')
-  const [result, setResult] = useState<AuditResult | null>(null)
+  const [singleResult, setSingleResult] = useState<SingleAuditResponse | null>(null)
   const [error, setError] = useState('')
 
   const [isBenchmarking, setIsBenchmarking] = useState(false)
-  const [benchmarkResults, setBenchmarkResults] = useState<{
-    gemini: AuditResult | null
-    deepseek: AuditResult | null
-  }>({ gemini: null, deepseek: null })
+  const [compareResult, setCompareResult] = useState<ComparativeAuditResponse | null>(null)
   const [metrics, setMetrics] = useState<ModelMetrics[]>([])
 
   const handleAudit = async (): Promise<void> => {
@@ -38,10 +42,10 @@ function App(): ReactElement {
     setIsLoading(true)
     setLoadingMessage('La IA está pensando y consultando el manual...')
     setError('')
-    setResult(null)
+    setSingleResult(null)
 
     try {
-      const response = await fetch('http://localhost:3001/api/audit', {
+      const response = await fetch('http://localhost:3001/api/audit/single', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, sql, target, schema: ddlSchema }),
@@ -50,8 +54,8 @@ function App(): ReactElement {
         const errData = await response.json().catch(() => ({}))
         throw new Error(errData.error || `Error HTTP ${response.status}`)
       }
-      const data: AuditResult = await response.json()
-      setResult(data)
+      const data: SingleAuditResponse = await response.json()
+      setSingleResult(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error de conexión con el servidor')
     } finally {
@@ -66,53 +70,43 @@ function App(): ReactElement {
     }
     setIsBenchmarking(true)
     setError('')
-    setBenchmarkResults({ gemini: null, deepseek: null })
+    setCompareResult(null)
     setMetrics([])
 
-    const models = [
-      { key: 'gemini' as const, name: 'gemini-2.5-flash' },
-      { key: 'deepseek' as const, name: 'deepseek-chat' },
-    ]
-
-    const results: { gemini: AuditResult | null; deepseek: AuditResult | null } = {
-      gemini: null,
-      deepseek: null,
-    }
-
-    for (const { key, name } of models) {
-      try {
-        const response = await fetch('http://localhost:3001/api/audit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: name, sql, target, schema: ddlSchema }),
-        })
-        if (response.ok) {
-          results[key] = await response.json()
-        }
-      } catch {
-        // Individual model failure is non-fatal
+    try {
+      const response = await fetch('http://localhost:3001/api/audit/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sql, target, schema: ddlSchema }),
+      })
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || `Error HTTP ${response.status}`)
       }
-    }
+      const data: ComparativeAuditResponse = await response.json()
+      setCompareResult(data)
 
-    setBenchmarkResults(results)
-
-    const newMetrics: ModelMetrics[] = []
-    if (results.gemini) {
-      newMetrics.push({
-        model: 'Gemini',
-        executionTime: results.gemini.executionTime,
-        tokensConsumed: Math.round(results.gemini.executionTime * 15 + 100),
-      })
+      const newMetrics: ModelMetrics[] = []
+      if (data.gemini) {
+        newMetrics.push({
+          model: 'Gemini',
+          executionTime: data.gemini.time * 1000,
+          tokensConsumed: data.gemini.tokens,
+        })
+      }
+      if (data.deepseek) {
+        newMetrics.push({
+          model: 'DeepSeek',
+          executionTime: data.deepseek.time * 1000,
+          tokensConsumed: data.deepseek.tokens,
+        })
+      }
+      setMetrics(newMetrics)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error de conexión con el servidor')
+    } finally {
+      setIsBenchmarking(false)
     }
-    if (results.deepseek) {
-      newMetrics.push({
-        model: 'DeepSeek',
-        executionTime: results.deepseek.executionTime,
-        tokensConsumed: Math.round(results.deepseek.executionTime * 12 + 80),
-      })
-    }
-    setMetrics(newMetrics)
-    setIsBenchmarking(false)
   }
 
   return (
@@ -198,10 +192,9 @@ function App(): ReactElement {
           </button>
         </div>
 
-        {/* Tab content */}
+        {/* Tab: Auditoría Rápida */}
         {activeTab === 'rapida' && (
           <div className="flex flex-col gap-4 flex-1">
-            {/* Model selector + button */}
             <div className="flex items-center gap-3">
               <select
                 value={model}
@@ -225,7 +218,6 @@ function App(): ReactElement {
               </button>
             </div>
 
-            {/* Loading message */}
             {isLoading && (
               <div className="flex items-center gap-3 text-slate-400 text-sm py-8 px-4 bg-gray-900/50 rounded-lg border border-gray-800">
                 <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
@@ -233,7 +225,6 @@ function App(): ReactElement {
               </div>
             )}
 
-            {/* Error */}
             {error && !isLoading && (
               <div className="flex items-start gap-3 text-red-400 text-sm p-4 bg-red-950/40 rounded-lg border border-red-900/50">
                 <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
@@ -241,52 +232,64 @@ function App(): ReactElement {
               </div>
             )}
 
-            {/* Result */}
-            {result && !isLoading && (
+            {singleResult && !isLoading && (
               <div className="flex flex-col gap-4 flex-1">
-                {/* Diagnosis */}
-                <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    Diagnóstico
-                  </h3>
-                  <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
-                    {result.diagnosis}
-                  </p>
+                {/* Model badge + tokens */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-slate-400 bg-gray-800 px-3 py-1 rounded-full">
+                    {singleResult.model}
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    ~{singleResult.tokens} tokens generados
+                  </span>
                 </div>
 
-                {/* Strategy */}
-                <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    Estrategia de Optimización
-                  </h3>
-                  <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
-                    {result.strategy}
-                  </p>
-                </div>
-
-                {/* Optimized SQL */}
+                {/* Result raw text */}
                 <div className="bg-gray-900 rounded-xl p-4 border border-gray-800 flex-1">
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    SQL Optimizado
+                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                    Respuesta de la IA
                   </h3>
-                  <pre className="text-sm text-emerald-300 font-mono whitespace-pre-wrap bg-gray-950 rounded-lg p-3 border border-gray-800 overflow-x-auto">
-                    {result.optimizedSql}
+                  <pre className="text-sm text-slate-200 font-mono whitespace-pre-wrap leading-relaxed bg-gray-950 rounded-lg p-3 border border-gray-800 overflow-x-auto max-h-[50vh] overflow-y-auto">
+                    {singleResult.result}
                   </pre>
                 </div>
 
-                {/* Footer: execution time */}
-                <div className="flex items-center gap-2 text-xs text-slate-500 border-t border-gray-800 pt-3">
-                  <Clock className="w-3.5 h-3.5" />
-                  Tiempo de ejecución:{' '}
-                  <span className="text-slate-300 font-mono">
-                    {(result.executionTime / 1000).toFixed(2)}s
-                  </span>
+                {/* Sources */}
+                {singleResult.sources.length > 0 && (
+                  <details className="bg-gray-900/60 rounded-xl border border-gray-800 group">
+                    <summary className="flex items-center gap-2 px-4 py-3 text-xs font-medium text-slate-400 cursor-pointer hover:text-slate-200 transition-colors select-none">
+                      <FileText className="w-3.5 h-3.5" />
+                      Fuentes consultadas ({singleResult.sources.length})
+                      <span className="ml-auto text-slate-600 group-open:rotate-180 transition-transform">▼</span>
+                    </summary>
+                    <div className="px-4 pb-3 flex flex-col gap-2 border-t border-gray-800 pt-3">
+                      {singleResult.sources.map((src, i) => (
+                        <div key={i} className="text-xs text-slate-500 bg-gray-950 rounded-lg p-3 border border-gray-800/50 leading-relaxed">
+                          <span className="text-slate-600 font-mono mr-2">[{i + 1}]</span>
+                          {src.length > 300 ? `${src.slice(0, 300)}...` : src}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+
+                {/* Footer */}
+                <div className="flex items-center gap-4 text-xs text-slate-500 border-t border-gray-800 pt-3">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5" />
+                    Tiempo:{' '}
+                    <span className="text-slate-300 font-mono">{singleResult.time.toFixed(2)}s</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5" />
+                    Fuentes:{' '}
+                    <span className="text-slate-300 font-mono">{singleResult.sources.length}</span>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Empty state */}
-            {!result && !isLoading && !error && (
+            {!singleResult && !isLoading && !error && (
               <div className="flex flex-col items-center justify-center flex-1 text-slate-600 gap-3">
                 <Sparkles className="w-10 h-10 text-slate-700" />
                 <p className="text-sm">Completa el formulario y ejecuta una auditoría para ver los resultados aquí.</p>
@@ -295,9 +298,9 @@ function App(): ReactElement {
           </div>
         )}
 
+        {/* Tab: Métricas y Comparativa */}
         {activeTab === 'metricas' && (
           <div className="flex flex-col gap-4 flex-1">
-            {/* Benchmark button */}
             <div className="flex items-center gap-3">
               <button
                 onClick={handleBenchmark}
@@ -319,67 +322,83 @@ function App(): ReactElement {
               )}
             </div>
 
-            {/* Benchmark results: two panels */}
-            {(benchmarkResults.gemini || benchmarkResults.deepseek) && !isBenchmarking && (
+            {compareResult && !isBenchmarking && (
               <>
                 <div className="grid grid-cols-2 gap-4">
-                  {/* Gemini panel */}
-                  <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-                    <h3 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      Gemini 2.5 Flash
-                    </h3>
-                    {benchmarkResults.gemini ? (
-                      <>
-                        <h4 className="text-[10px] text-slate-500 uppercase mb-1">SQL Optimizado</h4>
-                        <pre className="text-xs text-emerald-300 font-mono whitespace-pre-wrap bg-gray-950 rounded-lg p-3 border border-gray-800 overflow-x-auto max-h-48 overflow-y-auto">
-                          {benchmarkResults.gemini.optimizedSql}
-                        </pre>
-                        <div className="flex items-center gap-2 mt-3 text-[10px] text-slate-500">
-                          <Clock className="w-3 h-3" />
-                          {(benchmarkResults.gemini.executionTime / 1000).toFixed(2)}s
-                        </div>
-                      </>
-                    ) : (
-                      <p className="text-xs text-slate-600 italic">No disponible</p>
-                    )}
+                  {/* Gemini */}
+                  <div className="bg-gray-900 rounded-xl p-4 border border-gray-800 flex flex-col">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Gemini 2.5 Flash
+                      </h3>
+                      <span className="text-[10px] text-slate-500">~{compareResult.gemini.tokens} tok</span>
+                    </div>
+                    <pre className="text-xs text-emerald-300 font-mono whitespace-pre-wrap bg-gray-950 rounded-lg p-3 border border-gray-800 overflow-x-auto max-h-48 overflow-y-auto flex-1">
+                      {compareResult.gemini.result}
+                    </pre>
+                    <div className="flex items-center gap-2 mt-3 text-[10px] text-slate-500">
+                      <Clock className="w-3 h-3" />
+                      {compareResult.gemini.time.toFixed(2)}s
+                    </div>
                   </div>
 
-                  {/* DeepSeek panel */}
-                  <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-                    <h3 className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      DeepSeek Chat
-                    </h3>
-                    {benchmarkResults.deepseek ? (
-                      <>
-                        <h4 className="text-[10px] text-slate-500 uppercase mb-1">SQL Optimizado</h4>
-                        <pre className="text-xs text-blue-300 font-mono whitespace-pre-wrap bg-gray-950 rounded-lg p-3 border border-gray-800 overflow-x-auto max-h-48 overflow-y-auto">
-                          {benchmarkResults.deepseek.optimizedSql}
-                        </pre>
-                        <div className="flex items-center gap-2 mt-3 text-[10px] text-slate-500">
-                          <Clock className="w-3 h-3" />
-                          {(benchmarkResults.deepseek.executionTime / 1000).toFixed(2)}s
-                        </div>
-                      </>
-                    ) : (
-                      <p className="text-xs text-slate-600 italic">No disponible</p>
-                    )}
+                  {/* DeepSeek */}
+                  <div className="bg-gray-900 rounded-xl p-4 border border-gray-800 flex flex-col">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-xs font-semibold text-blue-400 uppercase tracking-wider flex items-center gap-2">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        DeepSeek Chat
+                      </h3>
+                      <span className="text-[10px] text-slate-500">~{compareResult.deepseek.tokens} tok</span>
+                    </div>
+                    <pre className="text-xs text-blue-300 font-mono whitespace-pre-wrap bg-gray-950 rounded-lg p-3 border border-gray-800 overflow-x-auto max-h-48 overflow-y-auto flex-1">
+                      {compareResult.deepseek.result}
+                    </pre>
+                    <div className="flex items-center gap-2 mt-3 text-[10px] text-slate-500">
+                      <Clock className="w-3 h-3" />
+                      {compareResult.deepseek.time.toFixed(2)}s
+                    </div>
                   </div>
                 </div>
 
                 {/* AnalyticsDashboard */}
                 <AnalyticsDashboard metrics={metrics} />
+
+                {/* Shared sources */}
+                {compareResult.sources.length > 0 && (
+                  <details className="bg-gray-900/60 rounded-xl border border-gray-800 group">
+                    <summary className="flex items-center gap-2 px-4 py-3 text-xs font-medium text-slate-400 cursor-pointer hover:text-slate-200 transition-colors select-none">
+                      <FileText className="w-3.5 h-3.5" />
+                      Fuentes compartidas del RAG ({compareResult.sources.length})
+                      <span className="ml-auto text-slate-600 group-open:rotate-180 transition-transform">▼</span>
+                    </summary>
+                    <div className="px-4 pb-3 flex flex-col gap-2 border-t border-gray-800 pt-3">
+                      {compareResult.sources.map((src, i) => (
+                        <div key={i} className="text-xs text-slate-500 bg-gray-950 rounded-lg p-3 border border-gray-800/50 leading-relaxed">
+                          <span className="text-slate-600 font-mono mr-2">[{i + 1}]</span>
+                          {src.length > 300 ? `${src.slice(0, 300)}...` : src}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
               </>
             )}
 
-            {/* Empty state */}
-            {!benchmarkResults.gemini && !benchmarkResults.deepseek && !isBenchmarking && (
+            {!compareResult && !isBenchmarking && (
               <div className="flex flex-col items-center justify-center flex-1 text-slate-600 gap-3">
                 <span className="text-4xl">⚖️</span>
                 <p className="text-sm">
                   Ejecuta un benchmark para comparar el rendimiento de ambos modelos.
                 </p>
+              </div>
+            )}
+
+            {error && !isBenchmarking && !compareResult && (
+              <div className="flex items-start gap-3 text-red-400 text-sm p-4 bg-red-950/40 rounded-lg border border-red-900/50">
+                <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
+                <span>{error}</span>
               </div>
             )}
           </div>
