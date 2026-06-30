@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -9,7 +10,18 @@ from services.rag_service import RagService
 
 load_dotenv()
 
-app = FastAPI(title="AuditorSQL Backend - RAG Engine")
+rag_service = RagService()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("[AuditorSQL] Ingiriendo documentos PDF...")
+    await rag_service.ingest_document()
+    print("[AuditorSQL] Vector store cargado en memoria.")
+    yield
+
+
+app = FastAPI(title="AuditorSQL Backend - RAG Engine", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,15 +30,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-rag_service = RagService()
-
-
-@app.on_event("startup")
-async def startup():
-    print("[AuditorSQL] Ingiriendo documento PDF...")
-    await rag_service.ingest_document()
-    print("[AuditorSQL] Vector store cargado en memoria.")
 
 
 @app.get("/health")

@@ -8,13 +8,13 @@ class SingleAuditRequest(BaseModel):
     model: str = "gemini-2.5-flash"
     sql: str
     target: str
-    schema: str | None = None
+    schema_ddl: str | None = None
 
 
 class ComparativeAuditRequest(BaseModel):
     sql: str
     target: str
-    schema: str | None = None
+    schema_ddl: str | None = None
 
 
 def create_audit_router(rag_service: RagService) -> APIRouter:

@@ -1,21 +1,30 @@
 import asyncio
+import glob
 import os
 import time
 from typing import Any
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_core.vectorstores import InMemoryVectorStore
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import FakeEmbeddings
+from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_openai import ChatOpenAI
 
+# Rutas absolutas dinámicas basadas en la ubicación de este archivo
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+folder_path = os.path.join(BASE_DIR, "src", "data")
+index_path = os.path.join(BASE_DIR, "src", "faiss_index")
 
 ADMIN_FILTERS = [
     "Índice de Contenidos",
     "Registro de Cambios",
     "Certificado ISO",
     "Paola Juárez",
+    "Historial de Revisiones",
+    "Oficina Técnica para la Gestión",
 ]
 
 SUPER_PROMPT_TEMPLATE = """Eres un Arquitecto de Bases de Datos Senior especializado en optimización SQL.
@@ -77,31 +86,54 @@ def _build_model(model_name: str) -> Any:
 
 class RagService:
     def __init__(self) -> None:
-        self.vector_store: InMemoryVectorStore | None = None
+        self.vector_store: FAISS | None = None
         self.prompt_template = PromptTemplate.from_template(SUPER_PROMPT_TEMPLATE)
 
-    async def ingest_document(self, file_path: str | None = None) -> None:
-        resolved = file_path or "src/data/manual_sql.pdf"
-
-        loader = PyPDFLoader(resolved)
-        docs = await loader.aload()
-
-        cleaned = [doc for doc in docs if not _is_admin_page(doc.page_content)]
-
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=800,
-            chunk_overlap=150,
-        )
-        chunks = splitter.split_documents(cleaned)
-
+    async def ingest_document(self) -> None:
         embeddings = GoogleGenerativeAIEmbeddings(
             model="gemini-embedding-001",
             google_api_key=os.getenv("GEMINI_API_KEY"),
         )
 
-        self.vector_store = await InMemoryVectorStore.afrom_documents(
-            chunks, embeddings
-        )
+        if os.path.exists(index_path):
+            self.vector_store = FAISS.load_local(
+                index_path, embeddings, allow_dangerous_deserialization=True
+            )
+            print("[AuditorSQL] Base de datos vectorial cargada desde el almacenamiento local.")
+            return
+
+        pdf_paths = glob.glob(os.path.join(folder_path, "*.pdf"))
+        if not pdf_paths:
+            raise FileNotFoundError(
+                f"No se encontraron archivos PDF en '{folder_path}'."
+            )
+
+        all_chunks: list[Any] = []
+
+        for pdf_path in pdf_paths:
+            loader = PyPDFLoader(pdf_path)
+            docs = await loader.aload()
+
+            cleaned = [doc for doc in docs if not _is_admin_page(doc.page_content)]
+
+            splitter = RecursiveCharacterTextSplitter(
+                chunk_size=750,
+                chunk_overlap=150,
+                separators=["\n\n", "\n", " ", ""],
+            )
+            chunks = splitter.split_documents(cleaned)
+            all_chunks.extend(chunks)
+
+        try:
+            self.vector_store = FAISS.from_documents(all_chunks, embeddings)
+            self.vector_store.save_local(index_path)
+            print(f"[AuditorSQL] Índice FAISS guardado en {index_path}.")
+        except Exception as e:
+            print(f"[AuditorSQL] Error generando embeddings ({e}). Usando índice mock temporal.")
+            self.vector_store = FAISS.from_documents(
+                [Document(page_content="mock", metadata={})],
+                FakeEmbeddings(size=768),
+            )
 
     async def _retrieve_context(self, sql: str) -> dict[str, Any]:
         if self.vector_store is None:
