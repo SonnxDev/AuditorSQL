@@ -1,66 +1,60 @@
 # AuditorSQL
 
-Plataforma web full-stack para auditoría y optimización de consultas SQL, impulsada por **IA Agentiva** con técnica **RAG (Retrieval-Augmented Generation)**.
+Plataforma web full-stack para auditoria y optimizacion de consultas SQL, impulsada por **IA Agentiva** con tecnica **RAG (Retrieval-Augmented Generation)**.
 
 ## Arquitectura
 
 ```
 AuditorSQL/
-├── backend/              # Motor de IA y RAG (Python + FastAPI + LangChain)
-│   ├── main.py           # Servidor FastAPI (puerto 3001)
+├── backend/                  # Motor de IA y RAG (Python + FastAPI + LangChain)
+│   ├── main.py               # Servidor FastAPI (puerto 3001)
 │   ├── services/
-│   │   └── rag_service.py   # Lógica RAG: ingesta, recuperación y generación
+│   │   └── rag_service.py    # Logica RAG: ingesta, recuperacion y generacion
 │   ├── routes/
-│   │   └── audit_routes.py  # Endpoints /api/audit/single y /api/audit/compare
-│   ├── src/data/         # PDFs/manuales fuente
+│   │   └── audit_routes.py   # Endpoints /api/audit/single y /api/audit/compare
+│   ├── src/data/             # PDFs/manuales fuente
 │   ├── .env / .env.template
 │   └── requirements.txt
 │
-└── frontend/             # Interfaz desktop web (Vite + React + TypeScript + Tailwind)
+└── frontend/                 # Interfaz desktop web (Vite + React + Tailwind)
     ├── src/
     │   ├── components/
-    │   │   └── AnalyticsDashboard.tsx  # Gráficos recharts (tiempo, tokens)
-    │   ├── App.tsx       # Split screen, tabs, fetch API
-    │   └── main.tsx
+    │   │   └── AuditorPanel.jsx   # Pantalla dividida: input SQL y resultados
+    │   ├── services/
+    │   │   └── api.js             # Capa de comunicacion con FastAPI
+    │   ├── App.jsx                # Layout principal con Navbar
+    │   ├── index.css              # Estilos globales y tema Tailwind
+    │   └── main.tsx               # Punto de entrada
     └── package.json
 ```
 
-## Stack Tecnológico
+## Stack Tecnologico
 
-| Capa       | Tecnología                          |
+| Capa       | Tecnologia                          |
 |------------|-------------------------------------|
-| Frontend   | React 19, TypeScript, Vite, Tailwind CSS 4 |
+| Frontend   | React 19, Vite, Tailwind CSS 4      |
 | Backend    | Python 3.10+, FastAPI, Uvicorn      |
 | IA / RAG   | LangChain, Google Gemini, DeepSeek  |
-| Vector DB  | InMemoryVectorStore (en memoria)    |
-| Documentos | PDFs técnicos parseados con PyPDF / pypdf |
+| Vector DB  | FAISS (en disco)                    |
+| Documentos | PDFs tecnicos parseados con PyPDF   |
 
 ## Endpoints de la API
 
-| Método | Ruta                    | Descripción                                |
+| Metodo | Ruta                    | Descripcion                                |
 |--------|------------------------|--------------------------------------------|
-| POST   | `/api/audit/single`    | Auditoría con un solo modelo (Gemini o DeepSeek) |
+| POST   | `/api/audit/single`    | Auditoria con un solo modelo (Gemini o DeepSeek) |
 | POST   | `/api/audit/compare`   | Benchmark comparativo entre ambos modelos  |
 | GET    | `/health`              | Health check del servidor                  |
 
-> La documentación interactiva (Swagger UI) está disponible en `http://localhost:3001/docs`
-
-## Flujo RAG
-
-1. **Ingesta** → PDFs se parsean con PyPDFLoader y se fragmentan en chunks.
-2. **Filtro** → Se descartan fragmentos administrativos ("Índice de Contenidos", "Registro de Cambios", etc.).
-3. **Indexación** → Cada chunk se vectoriza con `gemini-embedding-001` y se almacena en `InMemoryVectorStore`.
-4. **Consulta** → El usuario envía una consulta SQL y un objetivo desde el frontend.
-5. **Recuperación** → Se buscan los 4 chunks más relevantes por similitud coseno.
-6. **Generación** → El LLM responde con el contexto recuperado y se devuelven las *fuentes* utilizadas.
+> La documentacion interactiva (Swagger UI) esta disponible en `http://localhost:3001/docs`
 
 ## Requisitos
 
 - Python >= 3.10
 - pip
-- Node.js >= 18 (solo para el frontend)
+- Node.js >= 18
 
-## Inicio rápido
+## Inicio rapido
 
 ```bash
 # Backend
