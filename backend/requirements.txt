@@ -4,7 +4,9 @@ pydantic
 langchain
 langchain-community
 langchain-google-genai
+langchain-huggingface
 langchain-openai
 pypdf
 python-dotenv
 faiss-cpu
+sentence-transformers
