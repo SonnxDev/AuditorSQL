@@ -7,10 +7,9 @@ from typing import Any
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import FakeEmbeddings
-from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_openai import ChatOpenAI
 
 # Rutas absolutas dinámicas basadas en la ubicación de este archivo
@@ -90,17 +89,18 @@ class RagService:
         self.prompt_template = PromptTemplate.from_template(SUPER_PROMPT_TEMPLATE)
 
     async def ingest_document(self) -> None:
-        embeddings = GoogleGenerativeAIEmbeddings(
-            model="gemini-embedding-001",
-            google_api_key=os.getenv("GEMINI_API_KEY"),
+        embeddings = HuggingFaceEmbeddings(
+            model_name="paraphrase-multilingual-MiniLM-L12-v2",
         )
 
-        if os.path.exists(index_path):
+        faiss_index_file = os.path.join(index_path, "index.faiss")
+        ntotal = 0
+        if os.path.exists(faiss_index_file):
             self.vector_store = FAISS.load_local(
                 index_path, embeddings, allow_dangerous_deserialization=True
             )
-            print("[AuditorSQL] Base de datos vectorial cargada desde el almacenamiento local.")
-            return
+            ntotal = self.vector_store.index.ntotal
+            print(f"[AuditorSQL] Índice existente con {ntotal} vectores. Reanudando ingesta...")
 
         pdf_paths = glob.glob(os.path.join(folder_path, "*.pdf"))
         if not pdf_paths:
@@ -124,16 +124,30 @@ class RagService:
             chunks = splitter.split_documents(cleaned)
             all_chunks.extend(chunks)
 
-        try:
-            self.vector_store = FAISS.from_documents(all_chunks, embeddings)
+        BATCH_SIZE = 50
+        remaining_chunks = all_chunks[ntotal:]
+        total_chunks = len(remaining_chunks)
+
+        if total_chunks == 0:
+            print("[AuditorSQL] Todos los chunks ya están procesados.")
+            return
+
+        total_batches = (total_chunks + BATCH_SIZE - 1) // BATCH_SIZE
+        print(f"[AuditorSQL] Procesando {total_chunks} chunks nuevos en {total_batches} lotes de {BATCH_SIZE}...")
+
+        for i in range(0, total_chunks, BATCH_SIZE):
+            batch = remaining_chunks[i:i + BATCH_SIZE]
+            batch_num = i // BATCH_SIZE + 1
+
+            if self.vector_store is None:
+                self.vector_store = FAISS.from_documents(batch, embeddings)
+            else:
+                self.vector_store.add_documents(batch)
+
             self.vector_store.save_local(index_path)
-            print(f"[AuditorSQL] Índice FAISS guardado en {index_path}.")
-        except Exception as e:
-            print(f"[AuditorSQL] Error generando embeddings ({e}). Usando índice mock temporal.")
-            self.vector_store = FAISS.from_documents(
-                [Document(page_content="mock", metadata={})],
-                FakeEmbeddings(size=768),
-            )
+            print(f"[AuditorSQL] Lote {batch_num}/{total_batches} procesado y guardado ({len(batch)} chunks).")
+
+        print(f"[AuditorSQL] Ingesta completa. Índice FAISS en {index_path}.")
 
     async def _retrieve_context(self, sql: str) -> dict[str, Any]:
         if self.vector_store is None:
