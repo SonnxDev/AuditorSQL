@@ -26,7 +26,7 @@ ADMIN_FILTERS = [
     "Oficina Técnica para la Gestión",
 ]
 
-SUPER_PROMPT_TEMPLATE = """Eres un Ingeniero de Base de Datos Senior y un Auditor SQL implacable. A continuación, se te proporcionará un CONTEXTO extraído de un manual de bases de datos. TU DEBER ES EVALUAR ESTE CONTEXTO. Si el contexto proporcionado NO es directamente útil o relevante para optimizar o corregir la consulta SQL del usuario, TIENES ESTRICTAMENTE PROHIBIDO usarlo. En ese caso, IGNORA EL CONTEXTO POR COMPLETO y utiliza tu propio conocimiento experto para resolver el problema. No menciones que ignoraste el contexto, simplemente entrega la solución.
+SUPER_PROMPT_TEMPLATE = """Eres un Ingeniero de Base de Datos Senior y un Auditor SQL implacable. A continuación, se te proporcionará un CONTEXTO extraído de un manual de bases de datos. TU DEBER ES EVALUAR ESTE CONTEXTO. Si el contexto proporcionado NO es directamente útil o relevante para optimizar o corregir la consulta SQL del usuario, TIENES ESTRICTAMENTE PROHIBIDO usarlo. En ese caso, IGNORA EL CONTEXTO POR COMPLETO y utiliza tu propio conocimiento experto para resolver el problema.
 
 Contexto proporcionado:
 {context}
@@ -37,13 +37,15 @@ Consulta SQL a auditar:
 Objetivo de la auditoría:
 {target}
 
-Responde ÚNICAMENTE con el siguiente formato exacto, sin añadir texto adicional:
+Responde ÚNICAMENTE con el siguiente formato exacto, sin añadir texto adicional. Es obligatorio que el último campo indique si usaste el contexto o no.
 
 DIAGNÓSTICO: [Explica problemas de rendimiento, legibilidad y seguridad]
 
 ESTRATEGIA: [Describe paso a paso la optimización aplicada]
 
-SQL OPTIMIZADO: [Consulta corregida y optimizada]"""
+SQL OPTIMIZADO: [Consulta corregida y optimizada]
+
+USO_DE_RAG: [Responde estrictamente "SI" o "NO"]"""
 
 
 def _is_admin_page(text: str) -> bool:
@@ -174,10 +176,6 @@ class RagService:
 
         retrieved = await self._retrieve_context(sql)
 
-        def _source_used(source: str, response_text: str) -> bool:
-            sentences = [s.strip() for s in source.replace('\n', ' ').split('.') if len(s.strip()) > 30]
-            return any(s in response_text for s in sentences)
-
         async def _run_model(name: str) -> tuple[str, dict[str, Any]]:
             model = build_model(name)
             chain = self.prompt_template | model
@@ -190,12 +188,13 @@ class RagService:
             elapsed = time.perf_counter() - start
             result = response.content if isinstance(response.content, str) else ""
             tokens = _estimate_tokens(result)
-            used = [_source_used(src, result) for src in retrieved["sources"]]
+            rag_utilizado = "USO_DE_RAG: SI" in result.upper()
+            result_limpio = result.split("USO_DE_RAG:")[0].strip()
             return name, {
-                "result": result,
+                "result": result_limpio,
                 "time": round(elapsed, 4),
                 "tokens": tokens,
-                "sources_used": used,
+                "rag_utilizado": rag_utilizado,
             }
 
         results = await asyncio.gather(*[_run_model(m) for m in models])
