@@ -6,10 +6,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routes.audit_routes import create_audit_router
+from services.model_providers import register_all_models
 from services.rag_service import RagService
 
 load_dotenv()
 
+register_all_models()
 rag_service = RagService()
 
 

@@ -3,9 +3,37 @@ import { parseResult } from '../utils'
 import MetricCard from './MetricCard'
 import { Clock, FileText } from 'lucide-react'
 
+const MODEL_COLORS: Record<string, string> = {
+  'gemini-2.5-flash': 'bg-emerald-600/80',
+  'deepseek-chat': 'bg-blue-600/80',
+  'groq-llama-3-70b': 'bg-purple-600/80',
+  openrouter: 'bg-amber-600/80',
+}
+
+const FALLBACK_COLORS = [
+  'bg-rose-600/80',
+  'bg-cyan-600/80',
+  'bg-orange-600/80',
+  'bg-teal-600/80',
+]
+
+function modelHeaderClass(model: string, index: number): string {
+  return MODEL_COLORS[model] ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length]
+}
+
+function formatModelName(name: string): string {
+  const map: Record<string, string> = {
+    'gemini-2.5-flash': 'Gemini 2.5 Flash',
+    'deepseek-chat': 'DeepSeek Chat',
+    'groq-llama-3-70b': 'Groq Llama 3 70B',
+    openrouter: 'OpenRouter',
+  }
+  return map[name] ?? name
+}
+
 interface CompareCardsProps {
-  gemini: CompareAgentResult
-  deepseek: CompareAgentResult
+  results: Record<string, CompareAgentResult>
+  models: string[]
 }
 
 function AgentCard({
@@ -70,19 +98,17 @@ function AgentCard({
   )
 }
 
-export default function CompareCards({ gemini, deepseek }: CompareCardsProps) {
+export default function CompareCards({ results, models }: CompareCardsProps) {
   return (
-    <div className="flex flex-col md:flex-row gap-4">
-      <AgentCard
-        name="Gemini 2.5 Flash"
-        headerClass="bg-emerald-600/80"
-        data={gemini}
-      />
-      <AgentCard
-        name="DeepSeek Chat"
-        headerClass="bg-blue-600/80"
-        data={deepseek}
-      />
+    <div className="flex flex-wrap gap-4">
+      {models.map((model, i) => (
+        <AgentCard
+          key={model}
+          name={formatModelName(model)}
+          headerClass={modelHeaderClass(model, i)}
+          data={results[model]}
+        />
+      ))}
     </div>
   )
 }

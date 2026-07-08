@@ -14,6 +14,7 @@ class SingleAuditRequest(BaseModel):
 class ComparativeAuditRequest(BaseModel):
     sql: str
     target: str
+    models: list[str] | None = None
     schema_ddl: str | None = None
 
 
@@ -43,7 +44,7 @@ def create_audit_router(rag_service: RagService) -> APIRouter:
             )
         try:
             return await rag_service.execute_comparative_audit(
-                body.sql, body.target
+                body.sql, body.target, body.models
             )
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))

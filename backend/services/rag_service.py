@@ -8,9 +8,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_openai import ChatOpenAI
+
+from services.model_registry import build_model, list_models
 
 # Rutas absolutas dinámicas basadas en la ubicación de este archivo
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -53,34 +53,6 @@ def _is_admin_page(text: str) -> bool:
 
 def _estimate_tokens(text: str) -> int:
     return max(1, round(len(text) / 4))
-
-
-def _build_deepseek_model() -> ChatOpenAI:
-    api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY")
-    base_url = (
-        "https://api.deepseek.com/v1"
-        if os.getenv("DEEPSEEK_API_KEY")
-        else "https://openrouter.ai/api/v1"
-    )
-    model = "deepseek-chat" if os.getenv("DEEPSEEK_API_KEY") else "deepseek/deepseek-chat"
-    return ChatOpenAI(
-        model=model,
-        api_key=api_key,
-        base_url=base_url,
-        temperature=0.2,
-    )
-
-
-def _build_model(model_name: str) -> Any:
-    if model_name == "gemini-2.5-flash":
-        return ChatGoogleGenerativeAI(
-            model=model_name,
-            api_key=os.getenv("GEMINI_API_KEY"),
-            temperature=0.2,
-        )
-    if model_name == "deepseek-chat":
-        return _build_deepseek_model()
-    raise ValueError(f"Modelo no soportado: {model_name}")
 
 
 class RagService:
@@ -169,7 +141,7 @@ class RagService:
         start = time.perf_counter()
 
         retrieved = await self._retrieve_context(sql)
-        model = _build_model(model_name)
+        model = build_model(model_name)
         chain = self.prompt_template | model
         response = await chain.ainvoke({
             "context": retrieved["context"],
@@ -190,17 +162,19 @@ class RagService:
         }
 
     async def execute_comparative_audit(
-        self, sql: str, target: str
+        self,
+        sql: str,
+        target: str,
+        models: list[str] | None = None,
     ) -> dict[str, Any]:
+        if models is None:
+            models = list_models()
+
         retrieved = await self._retrieve_context(sql)
 
-        gemini_model = _build_model("gemini-2.5-flash")
-        deepseek_model = _build_model("deepseek-chat")
-
-        gemini_chain = self.prompt_template | gemini_model
-        deepseek_chain = self.prompt_template | deepseek_model
-
-        async def _run(chain: Any) -> dict[str, Any]:
+        async def _run_model(name: str) -> tuple[str, dict[str, Any]]:
+            model = build_model(name)
+            chain = self.prompt_template | model
             start = time.perf_counter()
             response = await chain.ainvoke({
                 "context": retrieved["context"],
@@ -210,18 +184,16 @@ class RagService:
             elapsed = time.perf_counter() - start
             result = response.content if isinstance(response.content, str) else ""
             tokens = _estimate_tokens(result)
-            return {
+            return name, {
                 "result": result,
                 "time": round(elapsed, 4),
                 "tokens": tokens,
             }
 
-        gemini_result, deepseek_result = await asyncio.gather(
-            _run(gemini_chain), _run(deepseek_chain)
-        )
+        results = await asyncio.gather(*[_run_model(m) for m in models])
 
         return {
-            "gemini": gemini_result,
-            "deepseek": deepseek_result,
+            "results": dict(results),
+            "models": models,
             "sources": retrieved["sources"],
         }

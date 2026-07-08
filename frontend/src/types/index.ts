@@ -13,8 +13,8 @@ export interface CompareAgentResult {
 }
 
 export interface CompareAuditResult {
-  gemini: CompareAgentResult
-  deepseek: CompareAgentResult
+  results: Record<string, CompareAgentResult>
+  models: string[]
   sources: string[]
 }
 

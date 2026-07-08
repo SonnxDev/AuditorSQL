@@ -23,12 +23,18 @@ export async function auditSingleQuery(
 export async function auditCompareQuery(
   sql: string,
   target: string,
+  models?: string[],
   schemaDdl?: string,
 ): Promise<CompareAuditResult> {
   const response = await fetch(`${API_BASE}/api/audit/compare`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sql, target, schema_ddl: schemaDdl || null }),
+    body: JSON.stringify({
+      sql,
+      target,
+      models: models || null,
+      schema_ddl: schemaDdl || null,
+    }),
   })
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}))

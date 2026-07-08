@@ -46,7 +46,7 @@ export default function CompareAudit() {
           <div className="flex items-center justify-center h-64 text-surface-500 gap-3">
             <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
             <span className="text-sm">
-              Ambos agentes están analizando la consulta simultáneamente...
+              Los agentes están analizando la consulta simultáneamente...
             </span>
           </div>
         )}
@@ -63,12 +63,12 @@ export default function CompareAudit() {
         {result && !loading && (
           <div className="flex flex-col gap-5">
             <CompareCards
-              gemini={result.gemini}
-              deepseek={result.deepseek}
+              results={result.results}
+              models={result.models}
             />
             <CompareChart
-              gemini={result.gemini}
-              deepseek={result.deepseek}
+              results={result.results}
+              models={result.models}
             />
             <RagCompareTable sources={result.sources} />
           </div>
