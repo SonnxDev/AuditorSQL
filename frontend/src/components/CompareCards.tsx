@@ -8,6 +8,8 @@ const MODEL_COLORS: Record<string, string> = {
   'deepseek-chat': 'bg-blue-600/80',
   'groq-llama-3-70b': 'bg-purple-600/80',
   openrouter: 'bg-amber-600/80',
+  'qwen-2.5-coder': 'bg-cyan-600/80',
+  'groq-llama-3': 'bg-orange-600/80',
 }
 
 const FALLBACK_COLORS = [
@@ -27,6 +29,8 @@ function formatModelName(name: string): string {
     'deepseek-chat': 'DeepSeek Chat',
     'groq-llama-3-70b': 'Groq Llama 3 70B',
     openrouter: 'OpenRouter',
+    'qwen-2.5-coder': 'Qwen 2.5 Coder 7B',
+    'groq-llama-3': 'Llama 3 (Groq)',
   }
   return map[name] ?? name
 }

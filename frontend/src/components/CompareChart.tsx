@@ -14,6 +14,8 @@ const MODEL_COLORS: Record<string, string> = {
   'deepseek-chat': '#3b82f6',
   'groq-llama-3-70b': '#a855f7',
   openrouter: '#f59e0b',
+  'qwen-2.5-coder': '#06b6d4',
+  'groq-llama-3': '#f97316',
 }
 
 const FALLBACK_COLORS = [

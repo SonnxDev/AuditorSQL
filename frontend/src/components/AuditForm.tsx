@@ -40,6 +40,8 @@ export default function AuditForm({ onExecute, isLoading }: AuditFormProps) {
         >
           <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
           <option value="deepseek-chat">DeepSeek Chat</option>
+          <option value="qwen-2.5-coder">Qwen 2.5 Coder 7B</option>
+          <option value="groq-llama-3">Llama 3 (Groq)</option>
         </select>
       </div>
 
