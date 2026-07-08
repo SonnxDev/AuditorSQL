@@ -18,9 +18,8 @@ Python 3.14 + FastAPI + LangChain + FAISS-CPU + HuggingFace Embeddings (locales,
 | ID | Proveedor | API Key |
 |---|---|---|
 | `gemini-2.5-flash` | Google Gemini | `GEMINI_API_KEY` |
-| `deepseek-chat` | DeepSeek / OpenRouter | `DEEPSEEK_API_KEY` o `OPENAI_API_KEY` |
+| `deepseek-chat` | DeepSeek vía OpenRouter | `OPENAI_API_KEY` |
 | `groq-llama-3-70b` | Groq (gratis) | `GROQ_API_KEY` |
-| `openrouter` | OpenRouter (200+ modelos) | `OPENAI_API_KEY` |
 
 > Los embeddings son 100% locales con `paraphrase-multilingual-MiniLM-L12-v2` vía `HuggingFaceEmbeddings`. Sin rate limits, sin cuotas.
 
