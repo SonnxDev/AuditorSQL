@@ -24,3 +24,12 @@ export interface AuditFormData {
   sql: string
   target: string
 }
+
+export interface MultiAgentResult {
+  gemini_plan: string
+  qwen_sql: string
+  llama_review: string
+  final_result: string
+  time: number
+  tokens: number
+}

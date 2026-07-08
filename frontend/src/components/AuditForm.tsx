@@ -6,11 +6,12 @@ interface AuditFormProps {
   onExecute: (data: AuditFormData) => Promise<void>
   isLoading: boolean
   showModelSelector?: boolean
+  multiagentActive?: boolean
 }
 
 const DEFAULT_TARGET = 'Optimizar tiempo de respuesta, identificar índices faltantes'
 
-export default function AuditForm({ onExecute, isLoading, showModelSelector = true }: AuditFormProps) {
+export default function AuditForm({ onExecute, isLoading, showModelSelector = true, multiagentActive = false }: AuditFormProps) {
   const [sql, setSql] = useState('')
   const [model, setModel] = useState('gemini-2.5-flash')
   const [target, setTarget] = useState('')
@@ -100,7 +101,11 @@ export default function AuditForm({ onExecute, isLoading, showModelSelector = tr
       <button
         onClick={handleSubmit}
         disabled={isDisabled}
-        className="flex items-center justify-center gap-2 w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-surface-800 disabled:text-surface-500 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-emerald-900/30 disabled:shadow-none"
+        className={`flex items-center justify-center gap-2 w-full py-2.5 text-white text-sm font-medium rounded-lg transition-all duration-300 disabled:shadow-none ${
+          multiagentActive
+            ? 'bg-orange-600 hover:bg-orange-500 disabled:bg-surface-800 disabled:text-surface-500 shadow-lg shadow-orange-900/40'
+            : 'bg-emerald-600 hover:bg-emerald-500 disabled:bg-surface-800 disabled:text-surface-500 shadow-lg shadow-emerald-900/30'
+        }`}
       >
         <Play className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
         {isLoading ? 'Procesando...' : 'Ejecutar Auditoría'}
