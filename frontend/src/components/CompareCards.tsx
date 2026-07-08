@@ -52,7 +52,7 @@ function AgentCard({
   const parsed = parseResult(data.result)
 
   return (
-    <div className="flex-1 bg-surface-900/40 rounded-xl border border-surface-800 overflow-hidden">
+    <div className="w-full bg-surface-900/40 rounded-xl border border-surface-800 overflow-hidden">
       <div className={`px-4 py-2.5 ${headerClass}`}>
         <h3 className="text-sm font-semibold text-white">{name}</h3>
       </div>
@@ -104,7 +104,7 @@ function AgentCard({
 
 export default function CompareCards({ results, models }: CompareCardsProps) {
   return (
-    <div className="flex flex-wrap gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {models.map((model, i) => (
         <AgentCard
           key={model}

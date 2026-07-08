@@ -5,11 +5,12 @@ import type { AuditFormData } from '../types'
 interface AuditFormProps {
   onExecute: (data: AuditFormData) => Promise<void>
   isLoading: boolean
+  showModelSelector?: boolean
 }
 
 const DEFAULT_TARGET = 'Optimizar tiempo de respuesta, identificar índices faltantes'
 
-export default function AuditForm({ onExecute, isLoading }: AuditFormProps) {
+export default function AuditForm({ onExecute, isLoading, showModelSelector = true }: AuditFormProps) {
   const [sql, setSql] = useState('')
   const [model, setModel] = useState('gemini-2.5-flash')
   const [target, setTarget] = useState('')
@@ -28,22 +29,24 @@ export default function AuditForm({ onExecute, isLoading }: AuditFormProps) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <label className="flex items-center gap-1.5 text-xs font-semibold text-surface-300 uppercase tracking-wider mb-1.5">
-          <Terminal className="w-3.5 h-3.5" />
-          Modelo
-        </label>
-        <select
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          className="w-full bg-surface-900 border border-surface-700 rounded-lg px-3 py-2.5 text-sm text-surface-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors"
-        >
-          <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-          <option value="deepseek-chat">DeepSeek Chat</option>
-          <option value="qwen-2.5-coder">Qwen 2.5 Coder 7B</option>
-          <option value="groq-llama-3">Llama 3 (Groq)</option>
-        </select>
-      </div>
+      {showModelSelector && (
+        <div>
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-surface-300 uppercase tracking-wider mb-1.5">
+            <Terminal className="w-3.5 h-3.5" />
+            Modelo
+          </label>
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            className="w-full bg-surface-900 border border-surface-700 rounded-lg px-3 py-2.5 text-sm text-surface-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors"
+          >
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+            <option value="deepseek-chat">DeepSeek Chat</option>
+            <option value="qwen-2.5-coder">Qwen 2.5 Coder 7B</option>
+            <option value="groq-llama-3">Llama 3 (Groq)</option>
+          </select>
+        </div>
+      )}
 
       <div>
         <label className="flex items-center gap-1.5 text-xs font-semibold text-surface-300 uppercase tracking-wider mb-1.5">
