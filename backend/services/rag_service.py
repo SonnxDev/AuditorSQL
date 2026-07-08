@@ -26,13 +26,12 @@ ADMIN_FILTERS = [
     "Oficina Técnica para la Gestión",
 ]
 
-SUPER_PROMPT_TEMPLATE = """Eres un Arquitecto de Bases de Datos Senior especializado en optimización SQL.
-Debes auditar la consulta proporcionada usando el contexto técnico disponible.
+SUPER_PROMPT_TEMPLATE = """Eres un Ingeniero de Base de Datos Senior y un Auditor SQL implacable. A continuación, se te proporcionará un CONTEXTO extraído de un manual de bases de datos. TU DEBER ES EVALUAR ESTE CONTEXTO. Si el contexto proporcionado NO es directamente útil o relevante para optimizar o corregir la consulta SQL del usuario, TIENES ESTRICTAMENTE PROHIBIDO usarlo. En ese caso, IGNORA EL CONTEXTO POR COMPLETO y utiliza tu propio conocimiento experto para resolver el problema. No menciones que ignoraste el contexto, simplemente entrega la solución.
 
-Contexto relevante:
+Contexto proporcionado:
 {context}
 
-Consulta SQL original:
+Consulta SQL a auditar:
 {sql}
 
 Objetivo de la auditoría:
@@ -127,7 +126,10 @@ class RagService:
                 "Vector store no inicializado. Ejecuta ingest_document primero."
             )
 
-        retriever = self.vector_store.as_retriever(search_kwargs={"k": 4})
+        retriever = self.vector_store.as_retriever(
+            search_type="mmr",
+            search_kwargs={"k": 5, "fetch_k": 20},
+        )
         relevant_docs = await retriever.ainvoke(sql)
 
         context = "\n\n".join(d.page_content for d in relevant_docs)
@@ -172,6 +174,10 @@ class RagService:
 
         retrieved = await self._retrieve_context(sql)
 
+        def _source_used(source: str, response_text: str) -> bool:
+            sentences = [s.strip() for s in source.replace('\n', ' ').split('.') if len(s.strip()) > 30]
+            return any(s in response_text for s in sentences)
+
         async def _run_model(name: str) -> tuple[str, dict[str, Any]]:
             model = build_model(name)
             chain = self.prompt_template | model
@@ -184,10 +190,12 @@ class RagService:
             elapsed = time.perf_counter() - start
             result = response.content if isinstance(response.content, str) else ""
             tokens = _estimate_tokens(result)
+            used = [_source_used(src, result) for src in retrieved["sources"]]
             return name, {
                 "result": result,
                 "time": round(elapsed, 4),
                 "tokens": tokens,
+                "sources_used": used,
             }
 
         results = await asyncio.gather(*[_run_model(m) for m in models])
