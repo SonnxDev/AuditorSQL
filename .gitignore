@@ -1,41 +1,29 @@
-# Dependencies
-node_modules/
-.pnp/
-.pnp.js
+# Python / Entornos
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+env/
 
-# Environment variables
+# Variables de Entorno
 .env
 .env.local
-.env.*.local
+.env.*
 
-# Build output
+# RAG / Bases de datos vectoriales
+backend/src/faiss_index/
+*.pkl
+
+# Frontend (React / Node)
+node_modules/
 dist/
 build/
-*.tsbuildinfo
+.npm/
 
-# Vector store (local FAISS indexes)
-backend/src/vector_store/
-
-# Uploaded/generated data
-backend/src/data/uploads/
-backend/src/data/processed/
-
-# IDE
-.vscode/settings.json
+# Sistema e IDE
+.vscode/
 .idea/
-*.swp
-*.swo
-*~
-
-# OS
 .DS_Store
-Thumbs.db
-*.log
 
-# Coverage
-coverage/
-.nyc_output/
-
-# Temp files
-tmp/
-temp/
+# Archivos de datos locales (PDFs pesados)
+backend/src/data/

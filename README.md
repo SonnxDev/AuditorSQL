@@ -1,64 +1,72 @@
 # AuditorSQL
 
-Plataforma web full-stack para auditoría y optimización de consultas SQL, impulsada por **IA Agentiva** con técnica **RAG (Retrieval-Augmented Generation)**.
+Plataforma web full-stack para auditoria y optimizacion de consultas SQL, impulsada por **IA Agentiva** con tecnica **RAG (Retrieval-Augmented Generation)**.
 
 ## Arquitectura
 
 ```
 AuditorSQL/
-├── backend/          # Motor de IA y RAG (Node.js + TypeScript + LangChain)
-│   ├── src/
-│   │   ├── controllers/    # Handlers HTTP
-│   │   ├── routes/         # Definición de rutas Express
-│   │   ├── services/       # Lógica de LangChain y RAG
-│   │   ├── data/           # PDFs/manuales fuente
-│   │   └── vector_store/   # Índices FAISS locales
+├── backend/                  # Motor de IA y RAG (Python + FastAPI + LangChain)
+│   ├── main.py               # Servidor FastAPI (puerto 3001)
+│   ├── services/
+│   │   └── rag_service.py    # Logica RAG: ingesta, recuperacion y generacion
+│   ├── routes/
+│   │   └── audit_routes.py   # Endpoints /api/audit/single y /api/audit/compare
+│   ├── src/data/             # PDFs/manuales fuente
 │   ├── .env / .env.template
-│   └── package.json
+│   └── requirements.txt
 │
-└── frontend/         # Interfaz desktop web (Vite + React + TypeScript + Tailwind)
+└── frontend/                 # Interfaz desktop web (Vite + React + Tailwind)
     ├── src/
     │   ├── components/
-    │   ├── pages/
-    │   ├── hooks/
-    │   └── services/
+    │   │   └── AuditorPanel.jsx   # Pantalla dividida: input SQL y resultados
+    │   ├── services/
+    │   │   └── api.js             # Capa de comunicacion con FastAPI
+    │   ├── App.jsx                # Layout principal con Navbar
+    │   ├── index.css              # Estilos globales y tema Tailwind
+    │   └── main.tsx               # Punto de entrada
     └── package.json
 ```
 
-## Stack Tecnológico
+## Stack Tecnologico
 
-| Capa       | Tecnología                          |
+| Capa       | Tecnologia                          |
 |------------|-------------------------------------|
-| Frontend   | React 18, TypeScript, Vite, Tailwind CSS |
-| Backend    | Node.js, Express, TypeScript        |
-| IA / RAG   | LangChain, OpenAI / Google GenAI    |
-| Vector DB  | FAISS (local, sin dependencias cloud) |
-| Documentos | PDFs técnicos parseados con pdf-parse |
+| Frontend   | React 19, Vite, Tailwind CSS 4      |
+| Backend    | Python 3.10+, FastAPI, Uvicorn      |
+| IA / RAG   | LangChain, Google Gemini, DeepSeek  |
+| Vector DB  | FAISS (en disco)                    |
+| Documentos | PDFs tecnicos parseados con PyPDF   |
 
-## Flujo RAG
+## Endpoints de la API
 
-1. **Ingesta** → PDFs se parsean y fragmentan en chunks.
-2. **Indexación** → Cada chunk se vectoriza y almacena en FAISS.
-3. **Consulta** → El usuario envía una query SQL o pregunta.
-4. **Recuperación** → Se buscan los chunks más relevantes por similitud coseno.
-5. **Generación** → El LLM responde con el contexto recuperado (auditoría/optimización).
+| Metodo | Ruta                    | Descripcion                                |
+|--------|------------------------|--------------------------------------------|
+| POST   | `/api/audit/single`    | Auditoria con un solo modelo (Gemini o DeepSeek) |
+| POST   | `/api/audit/compare`   | Benchmark comparativo entre ambos modelos  |
+| GET    | `/health`              | Health check del servidor                  |
+
+> La documentacion interactiva (Swagger UI) esta disponible en `http://localhost:3001/docs`
 
 ## Requisitos
 
+- Python >= 3.10
+- pip
 - Node.js >= 18
-- npm >= 9
 
-## Inicio rápido
+## Inicio rapido
 
 ```bash
 # Backend
 cd backend
-cp .env.template .env   # Configurar API keys
-npm install
-npm run dev
+cp .env.template .env   # Configurar API keys (GEMINI_API_KEY obligatoria)
+pip install -r requirements.txt
+python main.py
 
 # Frontend (otra terminal)
 cd frontend
 npm install
 npm run dev
 ```
+
+El backend arranca en `http://localhost:3001` y el frontend en `http://localhost:5173`.
