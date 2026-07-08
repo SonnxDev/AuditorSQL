@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from services.multiagent_service import execute_multiagent_pipeline
 from services.rag_service import RagService
 
 
@@ -15,6 +16,12 @@ class ComparativeAuditRequest(BaseModel):
     sql: str
     target: str
     models: list[str] | None = None
+    schema_ddl: str | None = None
+
+
+class MultiAgentRequest(BaseModel):
+    sql: str
+    target: str
     schema_ddl: str | None = None
 
 
@@ -45,6 +52,20 @@ def create_audit_router(rag_service: RagService) -> APIRouter:
         try:
             return await rag_service.execute_comparative_audit(
                 body.sql, body.target, body.models
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @router.post("/audit/multiagent")
+    async def multiagent_audit(body: MultiAgentRequest):
+        if not body.sql or not body.target:
+            raise HTTPException(
+                status_code=400,
+                detail="Faltan campos requeridos: sql y target son obligatorios.",
+            )
+        try:
+            return await execute_multiagent_pipeline(
+                body.sql, body.target, rag_service
             )
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
