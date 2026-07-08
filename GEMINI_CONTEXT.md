@@ -2,371 +2,164 @@
 
 ## Descripción General
 
-AuditorSQL es una plataforma web full-stack para auditoría y optimización de consultas SQL, impulsada por **IA Agentiva** con técnica **RAG (Retrieval-Augmented Generation)**. Permite al usuario pegar una consulta SQL, enviarla al backend donde se recupera contexto relevante desde un vector store (construido a partir de un PDF con reglas de optimización SQL), y luego consulta un **LLM** (Gemini o DeepSeek) para producir un diagnóstico, una estrategia de optimización y el SQL optimizado.
+Plataforma web full-stack para auditoría y optimización de consultas SQL, impulsada por **IA Agentiva** con **RAG (Retrieval-Augmented Generation)**. El usuario envía una consulta SQL, el backend recupera contexto desde un vector store FAISS (construido a partir de un PDF con reglas de optimización) y consulta uno o varios **LLMs** para producir diagnóstico, estrategia y SQL optimizado.
 
 ---
 
-## Stack Tecnológico Completo
+## Stack Tecnológico
 
 ### Frontend
-
-| Tecnología | Versión | Propósito |
-|---|---|---|
-| React | ^19.2.7 | Framework de UI |
-| TypeScript | ~6.0.2 | Tipado estático |
-| Vite | ^8.1.0 | Build tool / dev server |
-| Tailwind CSS | ^4.3.1 | Framework de utilidades CSS |
-| @tailwindcss/vite | ^4.3.1 | Plugin de Tailwind para Vite |
-| @vitejs/plugin-react | ^6.0.2 | Plugin de React para Vite (Oxc) |
-| lucide-react | ^1.22.0 | Librería de iconos |
-| recharts | ^3.9.2 | Librería de gráficos (AnalyticsDashboard) |
-| oxlint | ^1.69.0 | Linter (dev) |
+React 19 + TypeScript 6 + Vite 8 + Tailwind CSS 4 + lucide-react + recharts
 
 ### Backend
+Python 3.14 + FastAPI + LangChain + FAISS-CPU + HuggingFace Embeddings (locales, sin API keys)
 
-| Tecnología | Versión | Propósito |
+### Modelos Soportados
+| ID | Proveedor | API Key |
 |---|---|---|
-| Python | 3.14.0 | Runtime |
-| FastAPI | última | Framework web REST API |
-| uvicorn | última | Servidor ASGI |
-| pydantic | última | Validación de requests/responses |
-| python-dotenv | última | Carga de variables de entorno (.env) |
-| LangChain | última | Framework de orquestación LLM |
-| langchain-community | última | Integraciones comunitarias (PDF, FAISS, embeddings) |
-| langchain-google-genai | última | Integración con Google Gemini |
-| langchain-openai | última | Integración con API compatible OpenAI (DeepSeek) |
-| PyPDF | última | Parseo de PDFs |
-| faiss-cpu | última | Búsqueda de similitud vectorial |
+| `gemini-2.5-flash` | Google Gemini | `GEMINI_API_KEY` |
+| `deepseek-chat` | DeepSeek / OpenRouter | `DEEPSEEK_API_KEY` o `OPENAI_API_KEY` |
+| `groq-llama-3-70b` | Groq (gratis) | `GROQ_API_KEY` |
+| `openrouter` | OpenRouter (200+ modelos) | `OPENAI_API_KEY` |
 
-### LLMs / IA
-
-| Modelo | API | Provider | Propósito |
-|---|---|---|---|
-| gemini-2.5-flash | Google GenAI | Google | Chat / auditoría principal |
-| gemini-embedding-001 | Google GenAI | Google | Embeddings para RAG |
-| deepseek-chat | api.deepseek.com/v1 | DeepSeek | Chat / auditoría secundaria |
-| deepseek/deepseek-chat | openrouter.ai/api/v1 | OpenRouter | Fallback para DeepSeek |
+> Los embeddings son 100% locales con `paraphrase-multilingual-MiniLM-L12-v2` vía `HuggingFaceEmbeddings`. Sin rate limits, sin cuotas.
 
 ---
 
-## Arquitectura del Proyecto
+## Estructura del Proyecto
 
 ```
 AuditorSQL/
-├── backend/                          # Motor de IA y RAG (Python + FastAPI + LangChain)
-│   ├── main.py                       # Servidor FastAPI (puerto 3001)
-│   ├── services/
-│   │   └── rag_service.py            # Lógica RAG: ingesta, recuperación y generación
+├── backend/
+│   ├── main.py                           # FastAPI app, CORS, lifespan, registro de modelos
 │   ├── routes/
-│   │   ├── __init__.py
-│   │   └── audit_routes.py           # Endpoints POST /api/audit/single y /api/audit/compare
+│   │   └── audit_routes.py               # POST /api/audit/single, /api/audit/compare
+│   ├── services/
+│   │   ├── model_registry.py              # Registry pattern: register_model(), build_model(), list_models()
+│   │   ├── model_providers.py             # Fábricas de cada LLM (Gemini, DeepSeek, Groq, OpenRouter)
+│   │   └── rag_service.py                # Ingesta RAG, retrieve, execute_single_audit, execute_comparative_audit
 │   ├── src/
-│   │   ├── data/
-│   │   │   └── reglas_sql.pdf        # PDF fuente con reglas de optimización SQL
-│   │   └── faiss_index/
-│   │       ├── index.faiss           # Índice vectorial FAISS (binario)
-│   │       └── index.pkl             # Metadatos del índice (pickle)
-│   ├── .env                          # Variables de entorno (API keys)
-│   ├── .env.template                 # Plantilla de variables de entorno
-│   └── requirements.txt              # Dependencias Python
+│   │   ├── data/reglas_sql.pdf            # PDF fuente con reglas de optimización SQL
+│   │   └── faiss_index/                   # Índice FAISS (index.faiss + index.pkl)
+│   ├── .env / .env.template
+│   └── requirements.txt
 │
-├── frontend/                         # Interfaz desktop web (Vite + React + Tailwind)
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── AuditorPanel.jsx      # Pantalla principal: input SQL y resultados
-│   │   │   └── AnalyticsDashboard.tsx # Dashboard de benchmarks (no integrado aún)
-│   │   ├── services/
-│   │   │   └── api.js                # Capa de comunicación con FastAPI
-│   │   ├── App.jsx                   # Layout principal con Navbar
-│   │   ├── index.css                 # Estilos globales y tema Tailwind oscuro
-│   │   └── main.tsx                  # Punto de entrada React
-│   ├── index.html
-│   ├── package.json
-│   ├── vite.config.ts                # Configuración de Vite + React + Tailwind
-│   ├── tsconfig.json
-│   ├── tsconfig.app.json
-│   └── tsconfig.node.json
+├── frontend/
+│   └── src/
+│       ├── App.tsx                        # Shell con tabs: Auditoría Simple / Comparación de Agentes
+│       ├── layouts/AppLayout.tsx          # Navbar + wrapper surface-950
+│       ├── pages/
+│       │   ├── SimpleAudit.tsx            # Vista 1: form → ResultPanel
+│       │   └── CompareAudit.tsx           # Vista 2: form → CompareCards + CompareChart + RagCompareTable
+│       ├── components/
+│       │   ├── AuditForm.tsx              # Formulario compartido (model select, sql, target, schema)
+│       │   ├── ResultPanel.tsx            # SQL optimizado + Diagnóstico + Estrategia + Métricas + RAG
+│       │   ├── MetricCard.tsx             # Tarjeta de métrica (icono + label + valor)
+│       │   ├── RagSources.tsx             # Acordeón colapsable de fragmentos RAG
+│       │   ├── CompareCards.tsx           # N tarjetas lado a lado (una por modelo)
+│       │   ├── CompareChart.tsx           # BarCharts dinámicos (recharts) por modelo
+│       │   └── RagCompareTable.tsx        # Tabla colapsable de contexto RAG
+│       ├── services/api.ts                # API calls tipadas
+│       ├── types/index.ts                 # Interfaces compartidas
+│       └── utils.ts                       # parseResult() para extraer DIAGNÓSTICO/ESTRATEGIA/SQL
 │
-├── README.md
-└── GEMINI_CONTEXT.md                 # Este documento
+└── GEMINI_CONTEXT.md
 ```
 
 ---
 
-## Pipeline RAG (Recuperación y Generación)
+## Pipeline RAG
 
-### Fase de Ingesta (al iniciar el backend)
+### Ingesta (al iniciar el backend)
 
 ```
 reglas_sql.pdf
-       │
-       ▼
- PyPDFLoader (carga asíncrona)
-       │
-       ▼
- Filtro de páginas administrativas
-   (índice, registro de cambios, certificados, etc.)
-       │
-       ▼
- RecursiveCharacterTextSplitter
-   chunk_size=750, chunk_overlap=150
-   separators=["\n\n", "\n", " ", ""]
-       │
-       ▼
- GoogleGenerativeAIEmbeddings
-   (gemini-embedding-001)
-       │
-       ▼
- FAISS.from_documents(all_chunks, embeddings)
-       │
-       ├── Guardado en disco (src/faiss_index/)
-       └── Mantenido en memoria (self.vector_store)
+  → PyPDFLoader (aload asíncrono)
+  → Filtro de páginas administrativas (índice, cambios, certificados)
+  → RecursiveCharacterTextSplitter (chunk_size=750, overlap=150)
+  → HuggingFaceEmbeddings("paraphrase-multilingual-MiniLM-L12-v2") — LOCAL, sin API
+  → FAISS.from_documents / add_documents
+  → save_local() cada 50 chunks
 ```
 
-### Fase de Recuperación y Generación (por cada solicitud de auditoría)
+- Reanudación inteligente: si el índice ya existe, lee `ntotal` y salta los chunks ya procesados.
+- Embeddings locales = sin rate limits, sin time.sleep(), sin try-except de 429.
+
+### Recuperación + Generación (por request)
 
 ```
-Consulta SQL del usuario
-       │
-       ▼
- vector_store.as_retriever(search_kwargs={"k": 4})
-   (búsqueda de similitud FAISS)
-       │
-       ▼
- Top 4 chunks de documento más relevantes
-       │
-       ▼
- Plantilla de Prompt Supervisado
-   {context}  ← chunks recuperados unidos con "\n\n"
-   {sql}      ← SQL original del usuario
-   {target}   ← objetivo de auditoría
-       │
-       ▼
- LLM Chain (prompt_template | model)
-   ├── Gemini 2.5 Flash (single o compare)
-   └── DeepSeek Chat (compare)
-       │
-       ▼
- Respuesta estructurada:
-   DIAGNÓSTICO
-   ESTRATEGIA
-   SQL OPTIMIZADO
-```
-
-### Prompt Template Utilizado
-
-```
-Eres un Arquitecto de Bases de Datos Senior especializado en optimización SQL.
-Debes auditar la consulta proporcionada usando el contexto técnico disponible.
-
-Contexto relevante:
-{context}
-
-Consulta SQL original:
-{sql}
-
-Objetivo de la auditoría:
-{target}
-
-Responde ÚNICAMENTE con el siguiente formato exacto, sin añadir texto adicional:
-
-DIAGNÓSTICO: [Explica problemas de rendimiento, legibilidad y seguridad]
-
-ESTRATEGIA: [Describe paso a paso la optimización aplicada]
-
-SQL OPTIMIZADO: [Consulta corregida y optimizada]
+SQL del usuario
+  → FAISS similarity search (top-4, k=4)
+  → Prompt: contexto + sql + target
+  → LLM Chain (modelo elegido vía registry)
+  → Respuesta: DIAGNÓSTICO / ESTRATEGIA / SQL OPTIMIZADO
 ```
 
 ---
 
-## Endpoints de la API
-
-### `GET /health`
-
-Health check del servidor.
-
-**Respuesta:**
-```json
-{
-  "status": "ok",
-  "service": "AuditorSQL Backend - RAG Engine"
-}
-```
+## Endpoints
 
 ### `POST /api/audit/single`
 
-Auditoría con un solo modelo (Gemini o DeepSeek).
-
-**Request body:**
 ```json
-{
-  "model": "gemini-2.5-flash",
-  "sql": "SELECT * FROM users WHERE ...",
-  "target": "Optimizar tiempo de respuesta, identificar índices faltantes",
-  "schema_ddl": null
-}
+{ "model": "gemini-2.5-flash", "sql": "SELECT ...", "target": "...", "schema_ddl": null }
+→ { "model": "...", "result": "DIAGNÓSTICO:...", "time": 1.23, "tokens": 500, "sources": [...] }
 ```
-
-| Campo | Tipo | Obligatorio | Default | Descripción |
-|---|---|---|---|---|
-| `model` | string | No | `gemini-2.5-flash` | Modelo a usar |
-| `sql` | string | Sí | — | Consulta SQL a auditar |
-| `target` | string | No | `Optimizar rendimiento general` | Objetivo de la auditoría |
-| `schema_ddl` | string? | No | `null` | Placeholder (no usado actualmente) |
-
-**Respuesta:**
-```json
-{
-  "model": "gemini-2.5-flash",
-  "result": "DIAGNÓSTICO: ...\n\nESTRATEGIA: ...\n\nSQL OPTIMIZADO: ...",
-  "time": 2.3456,
-  "tokens": 512,
-  "sources": ["chunk1...", "chunk2...", "chunk3...", "chunk4..."]
-}
-```
-
-| Campo | Tipo | Descripción |
-|---|---|---|
-| `model` | string | Modelo que generó la respuesta |
-| `result` | string | Texto completo con DIAGNÓSTICO, ESTRATEGIA y SQL OPTIMIZADO |
-| `time` | float | Tiempo de ejecución en segundos |
-| `tokens` | int | Tokens estimados (longitud/4) |
-| `sources` | string[] | Hasta 4 chunks de contexto recuperados vía RAG |
 
 ### `POST /api/audit/compare`
 
-Benchmark comparativo entre Gemini y DeepSeek.
-
-**Request body:**
 ```json
-{
-  "sql": "SELECT * FROM users WHERE ...",
-  "target": "Optimizar tiempo de respuesta, identificar índices faltantes",
-  "schema_ddl": null
-}
+{ "sql": "SELECT ...", "target": "...", "models": ["gemini-2.5-flash", "deepseek-chat"] }
+→ { "results": { "gemini-2.5-flash": {...}, "deepseek-chat": {...} }, "models": [...], "sources": [...] }
 ```
 
-**Respuesta:**
-```json
-{
-  "gemini": {
-    "result": "DIAGNÓSTICO: ...",
-    "time": 2.3456,
-    "tokens": 512
-  },
-  "deepseek": {
-    "result": "DIAGNÓSTICO: ...",
-    "time": 3.1234,
-    "tokens": 480
-  },
-  "sources": ["chunk1...", "chunk2...", "chunk3...", "chunk4..."]
-}
-```
-
-> La documentación interactiva (Swagger UI) está disponible en `http://localhost:3001/docs`
+- Si `models` se omite, corre **todos los modelos registrados**.
+- Todos los modelos se ejecutan en paralelo vía `asyncio.gather`.
 
 ---
 
-## Flujo de Datos (Extremo a Extremo)
+## Model Registry — Cómo agregar un nuevo LLM
 
-```
-Usuario escribe SQL en textarea
-    │
-    ▼
-AuditorPanel.jsx: setLoading(true), llama auditSingleQuery(sql)
-    │
-    ▼
-api.js: POST fetch() a http://127.0.0.1:3001/api/audit/single
-    │
-    ▼
-FastAPI routes/audit_routes.py: valida body con Pydantic
-    │
-    ▼
-rag_service.execute_single_audit():
-    1. FAISS similarity search (top-4 chunks, sql como query)
-    2. Construye prompt con contexto + sql + target
-    3. Invoca ChatGoogleGenerativeAI (gemini-2.5-flash)
-       o ChatOpenAI (deepseek-chat)
-    4. Retorna {model, result, time, tokens, sources}
-    │
-    ▼
-Respuesta JSON al frontend
-    │
-    ▼
-AuditorPanel.jsx:
-    - parseResult() extrae DIAGNÓSTICO, ESTRATEGIA, SQL OPTIMIZADO (regex)
-    - Muestra: bloque SQL optimizado, tarjetas de diagnóstico/estrategia,
-      métricas (tiempo + tokens), snippets de fuentes RAG
-```
-
----
-
-## Configuración
-
-### Backend (.env)
-
-```
-PORT=3001
-OPENAI_API_KEY=sk-your-openai-key          # Fallback para DeepSeek vía OpenRouter
-GEMINI_API_KEY=your-gemini-api-key          # Obligatoria: embeddings + chat Gemini
-DEEPSEEK_API_KEY=your-deepseek-key          # Opcional: DeepSeek nativo
-```
-
-- Si `DEEPSEEK_API_KEY` está definida: se usa `https://api.deepseek.com/v1` con modelo `deepseek-chat`
-- Si no: se usa `https://openrouter.ai/api/v1` con modelo `deepseek/deepseek-chat` (requiere `OPENAI_API_KEY`)
-
-### Frontend (vite.config.ts)
-
-- Vite + React plugin (Oxc) + Tailwind CSS v4 plugin
-- Sin archivo PostCSS separado (Tailwind v4 se integra vía plugin)
-- Tema oscuro con paleta de colores `surface-*` personalizada en `index.css`
-
-### CORS
+El patrón **registry** permite agregar modelos sin modificar `rag_service.py` ni las rutas:
 
 ```python
-allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"]
+# services/model_providers.py
+
+def _build_mi_modelo() -> SomeLLM:
+    return SomeLLM(model="...", api_key=os.getenv("MI_API_KEY"), ...)
+
+register_model("mi-modelo-id", _build_mi_modelo)
 ```
+
+Requisitos:
+1. La fábrica debe retornar un objeto compatible con LangChain (`BaseLLM` o `BaseChatModel`).
+2. Registrarlo con `register_model("id", factory_function)`.
+3. Opcional: agregar color y nombre visible en `CompareCards.tsx` (diccionarios `MODEL_COLORS` y `formatModelName`).
+4. Opcional: agregar `API_KEY` al `.env.template`.
+
+El endpoint `/api/audit/compare` lo incluirá automáticamente. El frontend lo renderizará sin cambios (itera sobre `models[]`).
 
 ---
 
-## Detalles Técnicos Relevantes
-
-### Chunking del PDF
-- `RecursiveCharacterTextSplitter` con `chunk_size=750` y `chunk_overlap=150`
-- Separadores: `["\n\n", "\n", " ", ""]`
-- Páginas filtradas por palabras clave (índice, registro de cambios, certificados, etc.)
-
-### Fallback del Vector Store
-Si la ingesta FAISS falla (ej. error de API de embeddings), se usa un mock con `FakeEmbeddings(size=768)` y un solo `Document(page_content="mock")` para mantener el sistema funcionando sin crash.
-
-### Cálculo de Tokens
-- Aproximado: `max(1, round(len(text) / 4))` — asume ~4 caracteres por token.
-
-### Modelos Ejecutados en Paralelo
-El endpoint `/api/audit/compare` ejecuta Gemini y DeepSeek simultáneamente usando `asyncio.gather`.
-
-### Placeholders No Implementados
-- `schema_ddl` en los request models está definido pero no se utiliza en la lógica actual.
-- `AnalyticsDashboard.tsx` existe en frontend pero no está importado ni integrado.
-
-### Ausencia de Base de Datos
-No se utiliza ninguna base de datos. El único estado persistente son los archivos del índice FAISS en disco.
-
-### Sin Tests
-El proyecto no cuenta con framework de testing ni en backend ni en frontend.
-
----
-
-## Formato de Respuesta del LLM
-
-El LLM debe responder estrictamente con este formato (sin texto adicional):
+## Prompt Template
 
 ```
+Eres un Arquitecto de Bases de Datos Senior especializado en optimización SQL.
+...
 DIAGNÓSTICO: [texto]
-
 ESTRATEGIA: [texto]
-
 SQL OPTIMIZADO: [código SQL]
 ```
 
-El frontend parsea esta respuesta con una expresión regular para extraer cada sección.
+El frontend parsea con regex para extraer cada sección.
+
+---
+
+## Temas Clave
+
+- **Zero rate limits**: embeddings con HuggingFace local, LLMs vía API pero sin esperas entre lotes.
+- **Model Registry**: new model = new factory function + `register_model()`. No tocar routes ni service.
+- **Frontend dinámico**: `CompareCards` y `CompareChart` iteran sobre `models[]`, se adaptan a cualquier cantidad de agentes.
+- **Schema DDL**: campo definido en Pydantic pero no usado en la lógica actual (placeholder).
+- **Sin base de datos**: el único estado persistente es el índice FAISS en disco.
+- **Sin tests**: no hay framework de testing implementado.
