@@ -7,7 +7,6 @@ const MODEL_COLORS: Record<string, string> = {
   'gemini-2.5-flash': 'bg-emerald-600/80',
   'deepseek-chat': 'bg-blue-600/80',
   'groq-llama-3-70b': 'bg-purple-600/80',
-  openrouter: 'bg-amber-600/80',
   'qwen-2.5-coder': 'bg-cyan-600/80',
   'groq-llama-3': 'bg-orange-600/80',
 }
@@ -28,7 +27,6 @@ function formatModelName(name: string): string {
     'gemini-2.5-flash': 'Gemini 2.5 Flash',
     'deepseek-chat': 'DeepSeek Chat',
     'groq-llama-3-70b': 'Groq Llama 3 70B',
-    openrouter: 'OpenRouter',
     'qwen-2.5-coder': 'Qwen 2.5 Coder 7B',
     'groq-llama-3': 'Llama 3 (Groq)',
   }
@@ -51,10 +49,23 @@ function AgentCard({
 }) {
   const parsed = parseResult(data.result)
 
+  const ragUsed = data.rag_utilizado
+
   return (
     <div className="w-full bg-surface-900/40 rounded-xl border border-surface-800 overflow-hidden">
-      <div className={`px-4 py-2.5 ${headerClass}`}>
+      <div className={`flex items-center justify-between px-4 py-2.5 ${headerClass}`}>
         <h3 className="text-sm font-semibold text-white">{name}</h3>
+        <span
+          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+            ragUsed
+              ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+              : ragUsed === false
+                ? 'bg-surface-700/40 text-surface-400 border-surface-600/40'
+                : 'bg-surface-800/30 text-surface-500 border-surface-700/20'
+          }`}
+        >
+          {ragUsed ? 'RAG: Utilizadas' : ragUsed === false ? 'RAG: Descartadas' : 'RAG: —'}
+        </span>
       </div>
       <div className="p-4 flex flex-col gap-4 overflow-y-auto max-h-[75vh]">
         {parsed.diagnosis && (

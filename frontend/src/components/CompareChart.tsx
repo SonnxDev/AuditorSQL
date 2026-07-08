@@ -13,7 +13,6 @@ const MODEL_COLORS: Record<string, string> = {
   'gemini-2.5-flash': '#22c55e',
   'deepseek-chat': '#3b82f6',
   'groq-llama-3-70b': '#a855f7',
-  openrouter: '#f59e0b',
   'qwen-2.5-coder': '#06b6d4',
   'groq-llama-3': '#f97316',
 }

@@ -10,7 +10,7 @@ export interface CompareAgentResult {
   result: string
   time: number
   tokens: number
-  sources_used?: boolean[]
+  rag_utilizado?: boolean
 }
 
 export interface CompareAuditResult {

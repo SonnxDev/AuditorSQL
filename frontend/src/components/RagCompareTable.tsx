@@ -34,10 +34,10 @@ export default function RagCompareTable({ sources, models, results }: RagCompare
 
   if (!sources || sources.length === 0) return null
 
-  const usedByModel = (model: string, sourceIndex: number): boolean | null => {
+  const usedByModel = (model: string): boolean | null => {
     const agent = results[model]
-    if (!agent?.sources_used) return null
-    return agent.sources_used[sourceIndex] ?? false
+    if (agent?.rag_utilizado === undefined) return null
+    return agent.rag_utilizado
   }
 
   return (
@@ -94,7 +94,7 @@ export default function RagCompareTable({ sources, models, results }: RagCompare
                       : src}
                   </td>
                   {models.map((m) => {
-                    const used = usedByModel(m, i)
+                    const used = usedByModel(m)
                     const isUsed = used === true
                     const isUnknown = used === null
                     return (
