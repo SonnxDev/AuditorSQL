@@ -99,7 +99,7 @@ export default function CompareAudit() {
               results={result.results}
               models={result.models}
             />
-            <RagCompareTable sources={result.sources} models={result.models} />
+            <RagCompareTable sources={result.sources} models={result.models} results={result.results} />
           </div>
         )}
 
