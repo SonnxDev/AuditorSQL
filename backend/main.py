@@ -1,3 +1,11 @@
+"""
+Punto de entrada del servidor FastAPI para AuditorSQL.
+
+Inicializa la aplicación, configura CORS, registra los modelos LLM,
+ingesta el documento PDF en el vector store FAISS durante el lifespan,
+y monta las rutas de auditoría bajo el prefijo /api.
+"""
+
 import os
 from contextlib import asynccontextmanager
 
@@ -36,6 +44,7 @@ app.add_middleware(
 
 @app.get("/health")
 async def health():
+    """Health check del servidor."""
     return {"status": "ok", "service": "AuditorSQL Backend - RAG Engine"}
 
 

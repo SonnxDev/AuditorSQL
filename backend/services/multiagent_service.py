@@ -1,3 +1,16 @@
+"""
+Pipeline secuencial multiagente para auditoría SQL.
+
+Ejecuta 4 modelos LLM en cadena:
+  1. Planificador (Gemini) — genera un plan estratégico con ayuda del RAG.
+  2. Desarrollador (Qwen) — escribe el SQL optimizado según el plan.
+  3. Revisor (Llama 3) — comenta brevemente el rendimiento del SQL.
+  4. Auditor Final (DeepSeek) — emite el dictamen estructurado final.
+
+Cada prompt del pipeline está diseñado para una tarea específica.
+El cómputo de tokens es acumulativo (input + output de cada paso).
+"""
+
 import time
 
 from langchain_core.messages import HumanMessage
@@ -77,6 +90,7 @@ SQL OPTIMIZADO: [Consulta corregida y optimizada final]"""
 
 
 def _estimate_tokens(text: str) -> int:
+    """Estima la cantidad de tokens a partir de caracteres (~4 chars/token)."""
     return max(1, round(len(text) / 4))
 
 
@@ -85,6 +99,17 @@ async def execute_multiagent_pipeline(
     target: str,
     rag_service,
 ) -> dict:
+    """Ejecuta el pipeline multiagente completo de forma secuencial.
+
+    Args:
+        sql: Consulta SQL original a auditar.
+        target: Objetivo de la auditoría.
+        rag_service: Instancia de RagService con el vector store cargado.
+
+    Returns:
+        dict con las salidas de cada paso (gemini_plan, qwen_sql, llama_review,
+        final_result) más tiempo total y tokens acumulados.
+    """
     overall_start = time.perf_counter()
 
     retrieved = await rag_service._retrieve_context(sql)
