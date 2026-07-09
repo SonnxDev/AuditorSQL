@@ -1,3 +1,11 @@
+"""
+Servicio RAG (Retrieval-Augmented Generation) para AuditorSQL.
+
+Gestiona la ingesta de documentos PDF en un vector store FAISS con embeddings
+locales de HuggingFace, la recuperación de contexto relevante y la ejecución
+de auditorías individuales o comparativas contra múltiples modelos LLM.
+"""
+
 import asyncio
 import glob
 import os
@@ -12,7 +20,6 @@ from langchain_huggingface import HuggingFaceEmbeddings
 
 from services.model_registry import build_model, list_models
 
-# Rutas absolutas dinámicas basadas en la ubicación de este archivo
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 folder_path = os.path.join(BASE_DIR, "src", "data")
 index_path = os.path.join(BASE_DIR, "src", "faiss_index")
@@ -49,19 +56,28 @@ USO_DE_RAG: [Responde estrictamente "SI" o "NO"]"""
 
 
 def _is_admin_page(text: str) -> bool:
+    """Determina si una página del PDF es administrativa y debe omitirse."""
     return any(kw in text for kw in ADMIN_FILTERS)
 
 
 def _estimate_tokens(text: str) -> int:
+    """Estima la cantidad de tokens a partir del largo del texto."""
     return max(1, round(len(text) / 4))
 
 
 class RagService:
+    """Servicio principal de RAG: ingesta, recuperación y auditoría."""
+
     def __init__(self) -> None:
         self.vector_store: FAISS | None = None
         self.prompt_template = PromptTemplate.from_template(SUPER_PROMPT_TEMPLATE)
 
     async def ingest_document(self) -> None:
+        """Ingesta documentos PDF en el vector store FAISS.
+
+        Si ya existe un índice, lo reanuda saltando los chunks ya procesados.
+        Procesa los PDFs en lotes de 50 chunks, guardando cada lote en disco.
+        """
         embeddings = HuggingFaceEmbeddings(
             model_name="paraphrase-multilingual-MiniLM-L12-v2",
         )
@@ -123,6 +139,14 @@ class RagService:
         print(f"[AuditorSQL] Ingesta completa. Índice FAISS en {index_path}.")
 
     async def _retrieve_context(self, sql: str) -> dict[str, Any]:
+        """Recupera los fragmentos más relevantes del vector store.
+
+        Args:
+            sql: Consulta SQL usada como query de búsqueda.
+
+        Returns:
+            dict con 'context' (texto concatenado) y 'sources' (lista de fragmentos).
+        """
         if self.vector_store is None:
             raise RuntimeError(
                 "Vector store no inicializado. Ejecuta ingest_document primero."
@@ -142,6 +166,11 @@ class RagService:
     async def execute_single_audit(
         self, model_name: str, sql: str, target: str
     ) -> dict[str, Any]:
+        """Ejecuta una auditoría con un solo modelo LLM.
+
+        Recupera contexto RAG, construye la cadena LLM y devuelve
+        el resultado con métricas de tiempo y tokens.
+        """
         start = time.perf_counter()
 
         retrieved = await self._retrieve_context(sql)
@@ -171,6 +200,11 @@ class RagService:
         target: str,
         models: list[str] | None = None,
     ) -> dict[str, Any]:
+        """Ejecuta una auditoría comparativa con múltiples modelos en paralelo.
+
+        Cada modelo recibe el mismo contexto RAG y se ejecuta via asyncio.gather.
+        El resultado incluye si cada modelo usó o no el contexto RAG.
+        """
         if models is None:
             models = list_models()
 

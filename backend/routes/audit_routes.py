@@ -1,3 +1,12 @@
+"""
+Rutas HTTP para los endpoints de auditoría de AuditorSQL.
+
+Define los modelos Pydantic de request y los tres endpoints:
+- POST /audit/single  → auditoría con un modelo
+- POST /audit/compare → auditoría comparativa (paralelo)
+- POST /audit/multiagent → pipeline multiagente (secuencial)
+"""
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -26,6 +35,14 @@ class MultiAgentRequest(BaseModel):
 
 
 def create_audit_router(rag_service: RagService) -> APIRouter:
+    """Crea y retorna un router con los endpoints de auditoría.
+
+    Args:
+        rag_service: Instancia compartida de RagService inyectada desde main.py.
+
+    Returns:
+        APIRouter configurado con las rutas de auditoría.
+    """
     router = APIRouter()
 
     @router.post("/audit/single")
